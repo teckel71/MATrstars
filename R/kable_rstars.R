@@ -82,12 +82,16 @@ kable_rstars <- function(x,
 
   # Construir la llamada a kable() pasando solo los argumentos no nulos
   # para que knitr::kable use sus propios defaults cuando corresponda.
+  # En particular col.names: knitr::kable usa NA como default (que activa
+  # el cálculo automático de nombres desde colnames(x)), mientras que NULL
+  # produce cabeceras vacías. Por eso solo se incluye col.names en la lista
+  # si el usuario lo ha proporcionado explícitamente.
   kable_args <- list(x           = x,
                      caption     = caption,
-                     col.names   = col.names,
                      digits      = digits,
                      format.args = format.args,
                      ...)
+  if (!is.null(col.names)) kable_args$col.names <- col.names
 
   tabla <- do.call(knitr::kable, kable_args) %>%
     kableExtra::kable_styling(full_width        = full_width,
