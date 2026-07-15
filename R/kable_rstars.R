@@ -14,8 +14,24 @@
 #' `bootstrap_options` sin envolver en `c(...)`, lo que hacía que el estilo
 #' solo aplicara `"striped"` y descartara los otros dos).
 #'
+#' @section Supresión de caption en pipelines de numeración manual:
+#' El libro utiliza un preprocesador (`numerar_tablas_figuras.R`) que
+#' añade manualmente etiquetas `**Tabla X.Y**` / `**Figura X.Y**` bajo
+#' cada tabla y figura. Para que las llamadas a `kable_rstars()` situadas
+#' **dentro de otras funciones del paquete** (como `presenta_modelo()`,
+#' `generar_solucion()` o `predict_from_excel_scenarios()`) no produzcan
+#' doble auto-numeración por parte de bookdown, la función respeta la
+#' opción global `matrstars.suppress_caption`. Cuando esta opción está
+#' activa (habitualmente inyectada por el preprocesador vía un chunk de
+#' setup), el argumento `caption` se descarta antes de pasar a
+#' `knitr::kable()` y las tablas se emiten sin `<caption>`. La numeración
+#' y la descripción quedan a cargo del preprocesador. En uso interactivo
+#' (sin la opción activa) el comportamiento no cambia.
+#'
 #' @param x Data frame o matriz con los datos a mostrar.
 #' @param caption Título de la tabla. Por defecto `NULL` (sin título).
+#'   Puede ser ignorado si `getOption("matrstars.suppress_caption", FALSE)`
+#'   es `TRUE` (ver sección "Supresión de caption").
 #' @param col.names Vector de caracteres con los nombres de columna a mostrar.
 #'   Por defecto `NULL` (se usan los nombres del data frame).
 #' @param digits Número de dígitos decimales. Puede ser un escalar (aplicado
@@ -76,6 +92,16 @@ kable_rstars <- function(x,
                          bold_body    = FALSE,
                          format.args  = list(decimal.mark = ".", scientific = FALSE),
                          ...) {
+
+  # Supresión de caption cuando el sistema de numeración manual del libro
+  # ha activado la opción global (vía numerar_tablas_figuras.R). Sin esta
+  # comprobación, bookdown auto-numeraría las tablas producidas por otras
+  # funciones del paquete que llaman internamente a kable_rstars() con un
+  # caption fijo, generando prefijos dobles del tipo
+  # "Table X.Y: Table X.Z: <caption>" en el HTML.
+  if (isTRUE(getOption("matrstars.suppress_caption", FALSE))) {
+    caption <- NULL
+  }
 
   # Determinar número de filas de forma robusta (data frame, matrix, tibble)
   n_filas <- NROW(x)

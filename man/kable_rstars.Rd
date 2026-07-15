@@ -23,7 +23,9 @@ kable_rstars(
 \arguments{
 \item{x}{Data frame o matriz con los datos a mostrar.}
 
-\item{caption}{Título de la tabla. Por defecto \code{NULL} (sin título).}
+\item{caption}{Título de la tabla. Por defecto \code{NULL} (sin título).
+Puede ser ignorado si \code{getOption("matrstars.suppress_caption", FALSE)}
+es \code{TRUE} (ver sección "Supresión de caption").}
 
 \item{col.names}{Vector de caracteres con los nombres de columna a mostrar.
 Por defecto \code{NULL} (se usan los nombres del data frame).}
@@ -81,6 +83,22 @@ de raíz un error frecuente que aparecía en varias tablas (los tres
 \code{bootstrap_options} sin envolver en \code{c(...)}, lo que hacía que el estilo
 solo aplicara \code{"striped"} y descartara los otros dos).
 }
+\section{Supresión de caption en pipelines de numeración manual}{
+
+El libro utiliza un preprocesador (\code{numerar_tablas_figuras.R}) que
+añade manualmente etiquetas \verb{**Tabla X.Y**} / \verb{**Figura X.Y**} bajo
+cada tabla y figura. Para que las llamadas a \code{kable_rstars()} situadas
+\strong{dentro de otras funciones del paquete} (como \code{presenta_modelo()},
+\code{generar_solucion()} o \code{predict_from_excel_scenarios()}) no produzcan
+doble auto-numeración por parte de bookdown, la función respeta la
+opción global \code{matrstars.suppress_caption}. Cuando esta opción está
+activa (habitualmente inyectada por el preprocesador vía un chunk de
+setup), el argumento \code{caption} se descarta antes de pasar a
+\code{knitr::kable()} y las tablas se emiten sin \verb{<caption>}. La numeración
+y la descripción quedan a cargo del preprocesador. En uso interactivo
+(sin la opción activa) el comportamiento no cambia.
+}
+
 \examples{
 \dontrun{
 library(dplyr)
