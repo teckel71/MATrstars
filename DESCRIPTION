@@ -1,6 +1,6 @@
 Package: MATrstars
 Title: Funciones Auxiliares para el Libro R-Stars
-Version: 0.0.0.9003
+Version: 0.0.0.9004
 Authors@R: 
     person("Miguel Ángel", "Tarancón", 
            email = "MiguelAngel.Tarancon@uclm.es", 

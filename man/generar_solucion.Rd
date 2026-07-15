@@ -67,6 +67,22 @@ El nuevo comportamiento requiere que el usuario capture
 explicitamente el valor devuelto:
 \code{solucion <- generar_solucion(modelo)}.
 }
+\section{Coeficientes no finitos}{
+
+Cuando la tabla de contingencia de entrada contiene celdas de
+frecuencia 0, algunos coeficientes del modelo pueden resultar
+\code{Inf}, \code{-Inf} o \code{NaN}. Esto no es un error: es un fenomeno esperable
+derivado de que el estimador de maxima verosimilitud del modelo
+saturado no existe en sentido estricto sobre tablas con ceros
+muestrales (los parametros "se escapan al infinito" en el borde del
+espacio parametrico). La funcion detecta esta situacion y emite un
+\code{message()} informativo, pero no aborta ni imputa. El modelo sigue
+siendo utilizable como punto de partida para \code{\link[stats:step]{stats::step()}}, que
+opera sobre la desvianza (finita, valor 0 para el saturado) y no
+sobre los coeficientes patologicos. Vease Agresti (2013), cap. 9, y
+Fienberg (2007), cap. 5, para el tratamiento formal.
+}
+
 \examples{
 \dontrun{
 modelo_indep <- MASS::loglm(~ GALAXIA + FJUR + EFLO, data = tab_use)

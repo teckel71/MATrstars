@@ -21,6 +21,20 @@
 #' colateral del renderizado grafico y no forma parte del valor de
 #' retorno.
 #'
+#' @section Coeficientes no finitos:
+#' Cuando la tabla de contingencia de entrada contiene celdas de
+#' frecuencia 0, algunos coeficientes del modelo pueden resultar
+#' `Inf`, `-Inf` o `NaN`. Esto no es un error: es un fenomeno esperable
+#' derivado de que el estimador de maxima verosimilitud del modelo
+#' saturado no existe en sentido estricto sobre tablas con ceros
+#' muestrales (los parametros "se escapan al infinito" en el borde del
+#' espacio parametrico). La funcion detecta esta situacion y emite un
+#' `message()` informativo, pero no aborta ni imputa. El modelo sigue
+#' siendo utilizable como punto de partida para [stats::step()], que
+#' opera sobre la desvianza (finita, valor 0 para el saturado) y no
+#' sobre los coeficientes patologicos. Vease Agresti (2013), cap. 9, y
+#' Fienberg (2007), cap. 5, para el tratamiento formal.
+#'
 #' @note Esta funcion sustituye a la version anterior (previa a la
 #'   integracion en `MATrstars`) que asignaba la lista de resultado en
 #'   el Global Environment mediante `assign(..., envir = .GlobalEnv)`.
@@ -60,6 +74,7 @@
 #'
 #' @importFrom vcd mosaic shading_hcl
 #' @importFrom grid gpar
+#' @importFrom MASS loglm
 #' @export
 generar_solucion <- function(modelo,
                              captions = c("Validaci\u00f3n del modelo",
@@ -101,6 +116,20 @@ generar_solucion <- function(modelo,
 
   # --- Tabla 2: coeficientes del modelo ------------------------------------
   independencia_df <- extraer_coeficientes(modelo)
+
+  # Advertencia informativa ante coeficientes no finitos (Inf/-Inf/NaN):
+  # sintoma esperable de un modelo log-lineal ajustado sobre una tabla con
+  # celdas de frecuencia 0 (el MLE del modelo saturado no existe en sentido
+  # estricto; los coeficientes se "escapan al infinito"). Vease Agresti (2013),
+  # cap. 9, y Fienberg (2007), cap. 5.
+  if (any(!is.finite(independencia_df$Value))) {
+    message("Nota: el modelo contiene coeficientes no finitos ",
+            "(Inf/-Inf/NaN). Esto es esperable en modelos log-lineales ",
+            "ajustados sobre tablas con celdas de frecuencia 0: el estimador ",
+            "de m\u00e1xima verosimilitud del modelo saturado no existe en ",
+            "sentido estricto y los coeficientes se 'escapan al infinito'. ",
+            "V\u00e9ase Agresti (2013), cap. 9.")
+  }
 
   independencia_coef_tab <- do.call(
     kable_rstars,
