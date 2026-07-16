@@ -65,6 +65,26 @@ superior en el grafico de \code{vis_miss()}, que en ese caso quedan muy
 separadas del panel. Para mas de 4 variables, mantiene el angulo de 45
 grados habitual.
 }
+\section{Integracion con el preprocesador del libro R-Stars}{
+Cuando la funcion se ejecuta dentro de un documento R Markdown / knitr,
+emite el grafico y la tabla con el estilo tipografico habitual, e
+inserta ademas las etiquetas manuales "\strong{Figura X.Y}" y
+"\strong{Tabla X.Y}" justo debajo de cada uno de ellos, para respetar el
+patron gráfico -> etiqueta -> tabla -> etiqueta del libro.
+
+Para conocer los numeros X.Y de la figura y de la tabla, la funcion
+lee las opciones de sesion \code{matrstars.figura_num} y
+\code{matrstars.tabla_num}, que el preprocesador \code{numerar_tablas_figuras.R}
+inyecta al principio del chunk que la contiene. Si esas opciones no
+estan definidas (por ejemplo, porque la funcion se ejecuta en una
+sesion interactiva, en un script sin preprocesado, o en un chunk que
+no es el "oficial" del libro), la funcion NO emite etiquetas: solo el
+grafico y la tabla.
+
+El chunk debe llevar la opcion \code{results='asis'} para que las tablas
+HTML y las etiquetas markdown se rendericen correctamente.
+}
+
 \examples{
 \dontrun{
   library(MATrstars)
