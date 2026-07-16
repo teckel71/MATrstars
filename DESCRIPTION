@@ -1,6 +1,6 @@
 Package: MATrstars
 Title: Funciones Auxiliares para el Libro R-Stars
-Version: 0.0.0.9006
+Version: 0.0.0.9007
 Authors@R: 
     person("Miguel Ángel", "Tarancón", 
            email = "MiguelAngel.Tarancon@uclm.es", 
@@ -20,6 +20,7 @@ BugReports: https://github.com/teckel71/MATrstars/issues
 Imports: 
     broom,
     car,
+    dplyr,
     ggplot2,
     kableExtra,
     knitr,
@@ -27,5 +28,7 @@ Imports:
     MASS,
     patchwork,
     readxl,
+    rlang,
     tibble,
-    vcd
+    vcd,
+    visdat
