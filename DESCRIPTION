@@ -1,6 +1,6 @@
 Package: MATrstars
 Title: Funciones Auxiliares para el Libro R-Stars
-Version: 0.0.0.9007
+Version: 0.0.0.9010
 Authors@R: 
     person("Miguel Ángel", "Tarancón", 
            email = "MiguelAngel.Tarancon@uclm.es", 
@@ -29,6 +29,7 @@ Imports:
     patchwork,
     readxl,
     rlang,
+    scales,
     tibble,
     vcd,
     visdat
