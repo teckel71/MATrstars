@@ -6,10 +6,21 @@
 #' predicciones del modelo para cada escenario. Opcionalmente, presenta los
 #' resultados en una tabla formateada con [kable_rstars()].
 #'
-#' Utilidad principal: en las practicas del capitulo 9 (regresion lineal
-#' multiple) permite al alumno definir en Excel varios escenarios de prediccion
-#' sin necesidad de codificarlos en R, incluyendo formulas que referencian
-#' variables de los data frames del script.
+#' La funcion detecta automaticamente el tipo de modelo:
+#' \itemize{
+#'   \item **Modelos lineales** (`lm`): devuelve la prediccion puntual con
+#'         intervalos de prediccion o confianza, como hasta ahora.
+#'   \item **Modelos logit binomiales** (`glm` con `family = binomial`):
+#'         devuelve la probabilidad estimada con un intervalo de confianza
+#'         calculado en la escala del enlace (logit) y transformado a
+#'         probabilidades. Incluye ademas una columna de clasificacion segun
+#'         el umbral especificado.
+#' }
+#'
+#' Utilidad principal: en las practicas de los capitulos 9 (regresion lineal
+#' multiple) y 10 (modelos de eleccion discreta) permite al alumno definir en
+#' Excel varios escenarios de prediccion sin necesidad de codificarlos en R,
+#' incluyendo formulas que referencian variables de los data frames del script.
 #'
 #' Las formulas en las celdas de Excel se evaluan en un entorno donde:
 #' \itemize{
@@ -21,8 +32,8 @@
 #'         disponible bajo el nombre que se le asigne en la lista.
 #' }
 #'
-#' @param model Objeto de modelo ajustado (por ejemplo, devuelto por
-#'   [stats::lm()]).
+#' @param model Objeto de modelo ajustado, devuelto por [stats::lm()] o por
+#'   [stats::glm()] con `family = binomial(link = "logit")`.
 #' @param train_df Data frame de entrenamiento del modelo. Se utiliza para
 #'   determinar los niveles de las variables factor y para resolver las
 #'   referencias a variables sin prefijo dentro de las formulas de Excel.
@@ -39,13 +50,17 @@
 #'   `df1$IVENTAS`. Por defecto, `list()` (solo `train_df` bajo el alias
 #'   `train`).
 #' @param interval Tipo de intervalo devuelto por [stats::predict.lm()]:
-#'   `"prediction"` (por defecto) o `"confidence"`.
+#'   `"prediction"` (por defecto) o `"confidence"`. Para modelos logit se
+#'   ignora (siempre se calcula un intervalo de confianza sobre la
+#'   probabilidad).
 #' @param level Nivel de confianza del intervalo. Por defecto `0.95`.
 #' @param transforma_log Si `TRUE`, aplica `exp()` a las predicciones y a los
 #'   extremos del intervalo. Util cuando el modelo estima `log(y)` pero se
 #'   desea presentar los resultados en la escala original de `y`. La
 #'   desviacion tipica se transforma mediante el metodo delta aproximado. Por
-#'   defecto, `FALSE`.
+#'   defecto, `FALSE`. Se ignora para modelos logit.
+#' @param umbral Probabilidad umbral para la clasificacion en modelos logit.
+#'   Por defecto `0.5`. Se ignora para modelos lineales.
 #' @param return_kable Si `TRUE` (por defecto), devuelve ademas una tabla
 #'   formateada con [kable_rstars()] en el elemento `$table` de la lista de
 #'   salida. Si `FALSE`, ese elemento vale `NULL`.
@@ -60,35 +75,43 @@
 #'
 #' @return Una lista con dos elementos:
 #' \itemize{
-#'   \item `data`: data frame con una fila por escenario, incluyendo la
-#'         columna identificadora, las variables explicativas evaluadas, la
-#'         prediccion puntual (`.fitted`), los extremos del intervalo
-#'         (`.lwr`, `.upr`), la desviacion tipica de la prediccion
-#'         (`.se_fit`) y los metadatos `.interval`, `.level` y
-#'         `.log_transform`.
+#'   \item `data`: data frame con una fila por escenario. Para modelos
+#'         lineales incluye `.fitted`, `.lwr`, `.upr`, `.se_fit` y metadatos.
+#'         Para modelos logit incluye `.prob` (probabilidad estimada),
+#'         `.prob_lwr` y `.prob_upr` (intervalo de confianza sobre la
+#'         probabilidad), `.se_link` (error estandar en la escala logit) y
+#'         `.clasif` (clasificacion segun el umbral).
 #'   \item `table`: objeto `knitr_kable` con el data frame anterior
 #'         formateado con [kable_rstars()] (o `NULL` si `return_kable = FALSE`).
 #' }
 #'
 #' @examples
 #' \dontrun{
-#' # Estimacion de un modelo log-lineal
-#' modelo <- lm(log(mpg) ~ wt + hp, data = mtcars)
-#'
-#' # Predicciones desde un archivo Excel con escenarios
+#' # --- Modelo lineal (capitulo 9) ---
+#' modelo_lm <- lm(log(mpg) ~ wt + hp, data = mtcars)
 #' res <- predict_from_excel_scenarios(
-#'   model          = modelo,
+#'   model          = modelo_lm,
 #'   train_df       = mtcars,
 #'   excel_path     = "escenarios.xlsx",
 #'   sheet          = "Simula1",
 #'   transforma_log = TRUE
 #' )
+#' res$table
 #'
-#' res$table    # tabla formateada
-#' res$data     # data frame crudo
+#' # --- Modelo logit (capitulo 10) ---
+#' modelo_glm <- glm(am ~ wt + hp, data = mtcars,
+#'                   family = binomial(link = "logit"))
+#' res2 <- predict_from_excel_scenarios(
+#'   model    = modelo_glm,
+#'   train_df = mtcars,
+#'   excel_path = "escenarios_logit.xlsx",
+#'   umbral   = 0.5
+#' )
+#' res2$table
 #' }
 #'
 #' @importFrom readxl read_excel
+#' @importFrom stats family
 #' @export
 predict_from_excel_scenarios <- function(model,
                                          train_df,
@@ -99,11 +122,17 @@ predict_from_excel_scenarios <- function(model,
                                          interval = c("prediction", "confidence"),
                                          level = 0.95,
                                          transforma_log = FALSE,
+                                         umbral = 0.5,
                                          return_kable = TRUE,
                                          caption = "Predicciones por escenario",
                                          ...) {
 
   interval <- match.arg(interval)
+
+  # --- Detectar tipo de modelo ------------------------------------------------
+  es_logit <- inherits(model, "glm") &&
+    family(model)$family == "binomial" &&
+    family(model)$link   == "logit"
 
   form   <- stats::formula(model)
   y_name <- all.vars(form)[1]
@@ -189,52 +218,105 @@ predict_from_excel_scenarios <- function(model,
   rownames(newdatas) <- NULL
 
   # --- Prediccion ------------------------------------------------------------
-  preds <- stats::predict(model,
-                          newdata  = newdatas[, vars_x, drop = FALSE],
-                          interval = interval,
-                          level    = level,
-                          se.fit   = TRUE)
 
-  fit_mat <- as.data.frame(preds$fit)
-  names(fit_mat) <- c("fit", "lwr", "upr")
-  se_vec <- as.numeric(preds$se.fit)
+  nd_x <- newdatas[, vars_x, drop = FALSE]
 
-  # --- Transformacion antilog si corresponde ---------------------------------
-  if (transforma_log) {
-    fitted_vals <- exp(fit_mat$fit)
-    lwr_vals    <- exp(fit_mat$lwr)
-    upr_vals    <- exp(fit_mat$upr)
-    # Metodo delta aproximado para la desviacion tipica en escala original
-    se_vals     <- exp(fit_mat$fit) * se_vec
+  if (es_logit) {
+
+    # ── Rama GLM logit ──────────────────────────────────────────────────────
+    # Predecir en la escala del enlace (logit) con error estandar
+    preds <- stats::predict(model, newdata = nd_x,
+                            type = "link", se.fit = TRUE)
+
+    eta    <- as.numeric(preds$fit)
+    se_eta <- as.numeric(preds$se.fit)
+
+    # Intervalo de confianza en la escala del logit
+    z_crit  <- stats::qnorm(1 - (1 - level) / 2)
+    eta_lwr <- eta - z_crit * se_eta
+    eta_upr <- eta + z_crit * se_eta
+
+    # Transformacion a probabilidades (inversa logistica)
+    inv_logit <- function(x) 1 / (1 + exp(-x))
+
+    prob_est <- inv_logit(eta)
+    prob_lwr <- inv_logit(eta_lwr)
+    prob_upr <- inv_logit(eta_upr)
+
+    # Clasificacion segun umbral
+    clasif <- ifelse(prob_est >= umbral, 1, 0)
+
+    if (transforma_log) {
+      message("Nota: 'transforma_log' se ignora para modelos logit ",
+              "(la transformaci\u00f3n a probabilidades es inherente al modelo).")
+    }
+
+    out_df <- cbind(
+      newdatas[, c(id_col, vars_x), drop = FALSE],
+      .prob     = prob_est,
+      .prob_lwr = prob_lwr,
+      .prob_upr = prob_upr,
+      .se_link  = se_eta,
+      .clasif   = clasif,
+      .level    = level,
+      .umbral   = umbral
+    )
+
   } else {
-    fitted_vals <- as.numeric(fit_mat$fit)
-    lwr_vals    <- as.numeric(fit_mat$lwr)
-    upr_vals    <- as.numeric(fit_mat$upr)
-    se_vals     <- se_vec
-  }
 
-  out_df <- cbind(
-    newdatas[, c(id_col, vars_x), drop = FALSE],
-    .fitted        = fitted_vals,
-    .lwr           = lwr_vals,
-    .upr           = upr_vals,
-    .se_fit        = se_vals,
-    .interval      = interval,
-    .level         = level,
-    .log_transform = transforma_log
-  )
+    # ── Rama LM (comportamiento original) ───────────────────────────────────
+    preds <- stats::predict(model, newdata = nd_x,
+                            interval = interval, level = level,
+                            se.fit = TRUE)
+
+    fit_mat <- as.data.frame(preds$fit)
+    names(fit_mat) <- c("fit", "lwr", "upr")
+    se_vec <- as.numeric(preds$se.fit)
+
+    if (transforma_log) {
+      fitted_vals <- exp(fit_mat$fit)
+      lwr_vals    <- exp(fit_mat$lwr)
+      upr_vals    <- exp(fit_mat$upr)
+      se_vals     <- exp(fit_mat$fit) * se_vec
+    } else {
+      fitted_vals <- as.numeric(fit_mat$fit)
+      lwr_vals    <- as.numeric(fit_mat$lwr)
+      upr_vals    <- as.numeric(fit_mat$upr)
+      se_vals     <- se_vec
+    }
+
+    out_df <- cbind(
+      newdatas[, c(id_col, vars_x), drop = FALSE],
+      .fitted        = fitted_vals,
+      .lwr           = lwr_vals,
+      .upr           = upr_vals,
+      .se_fit        = se_vals,
+      .interval      = interval,
+      .level         = level,
+      .log_transform = transforma_log
+    )
+  }
 
   # --- Salida formateada opcional --------------------------------------------
   if (return_kable) {
     args <- list(...)
     if (!"digits" %in% names(args)) args$digits <- 3
 
-    caption_final <- paste0(
-      caption,
-      " \u2014 Variable dependiente: ", y_name,
-      " (", interval, " ", level * 100, "%)",
-      if (transforma_log) " \u2014 valores antilog."
-    )
+    if (es_logit) {
+      caption_final <- paste0(
+        caption,
+        " \u2014 P(", y_name, " = 1)",
+        " (IC ", level * 100, "%",
+        ", umbral = ", umbral, ")"
+      )
+    } else {
+      caption_final <- paste0(
+        caption,
+        " \u2014 Variable dependiente: ", y_name,
+        " (", interval, " ", level * 100, "%)",
+        if (transforma_log) " \u2014 valores antilog."
+      )
+    }
 
     tab <- do.call(
       kable_rstars,

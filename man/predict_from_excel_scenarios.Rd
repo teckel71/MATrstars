@@ -14,14 +14,15 @@ predict_from_excel_scenarios(
   interval = c("prediction", "confidence"),
   level = 0.95,
   transforma_log = FALSE,
+  umbral = 0.5,
   return_kable = TRUE,
   caption = "Predicciones por escenario",
   ...
 )
 }
 \arguments{
-\item{model}{Objeto de modelo ajustado (por ejemplo, devuelto por
-\code{\link[stats:lm]{stats::lm()}}).}
+\item{model}{Objeto de modelo ajustado, devuelto por \code{\link[stats:lm]{stats::lm()}} o por
+\code{\link[stats:glm]{stats::glm()}} con \code{family = binomial(link = "logit")}.}
 
 \item{train_df}{Data frame de entrenamiento del modelo. Se utiliza para
 determinar los niveles de las variables factor y para resolver las
@@ -44,7 +45,9 @@ Excel. Por ejemplo, \code{list(df1 = seleccion)} permite escribir en Excel
 \code{train}).}
 
 \item{interval}{Tipo de intervalo devuelto por \code{\link[stats:predict.lm]{stats::predict.lm()}}:
-\code{"prediction"} (por defecto) o \code{"confidence"}.}
+\code{"prediction"} (por defecto) o \code{"confidence"}. Para modelos logit se
+ignora (siempre se calcula un intervalo de confianza sobre la
+probabilidad).}
 
 \item{level}{Nivel de confianza del intervalo. Por defecto \code{0.95}.}
 
@@ -52,7 +55,10 @@ Excel. Por ejemplo, \code{list(df1 = seleccion)} permite escribir en Excel
 extremos del intervalo. Util cuando el modelo estima \code{log(y)} pero se
 desea presentar los resultados en la escala original de \code{y}. La
 desviacion tipica se transforma mediante el metodo delta aproximado. Por
-defecto, \code{FALSE}.}
+defecto, \code{FALSE}. Se ignora para modelos logit.}
+
+\item{umbral}{Probabilidad umbral para la clasificacion en modelos logit.
+Por defecto \code{0.5}. Se ignora para modelos lineales.}
 
 \item{return_kable}{Si \code{TRUE} (por defecto), devuelve ademas una tabla
 formateada con \code{\link[=kable_rstars]{kable_rstars()}} en el elemento \verb{$table} de la lista de
@@ -71,12 +77,12 @@ aplica un valor por defecto de \code{3}.}
 \value{
 Una lista con dos elementos:
 \itemize{
-\item \code{data}: data frame con una fila por escenario, incluyendo la
-columna identificadora, las variables explicativas evaluadas, la
-prediccion puntual (\code{.fitted}), los extremos del intervalo
-(\code{.lwr}, \code{.upr}), la desviacion tipica de la prediccion
-(\code{.se_fit}) y los metadatos \code{.interval}, \code{.level} y
-\code{.log_transform}.
+\item \code{data}: data frame con una fila por escenario. Para modelos
+lineales incluye \code{.fitted}, \code{.lwr}, \code{.upr}, \code{.se_fit} y metadatos.
+Para modelos logit incluye \code{.prob} (probabilidad estimada),
+\code{.prob_lwr} y \code{.prob_upr} (intervalo de confianza sobre la
+probabilidad), \code{.se_link} (error estandar en la escala logit) y
+\code{.clasif} (clasificacion segun el umbral).
 \item \code{table}: objeto \code{knitr_kable} con el data frame anterior
 formateado con \code{\link[=kable_rstars]{kable_rstars()}} (o \code{NULL} si \code{return_kable = FALSE}).
 }
@@ -89,10 +95,21 @@ predicciones del modelo para cada escenario. Opcionalmente, presenta los
 resultados en una tabla formateada con \code{\link[=kable_rstars]{kable_rstars()}}.
 }
 \details{
-Utilidad principal: en las practicas del capitulo 9 (regresion lineal
-multiple) permite al alumno definir en Excel varios escenarios de prediccion
-sin necesidad de codificarlos en R, incluyendo formulas que referencian
-variables de los data frames del script.
+La funcion detecta automaticamente el tipo de modelo:
+\itemize{
+\item \strong{Modelos lineales} (\code{lm}): devuelve la prediccion puntual con
+intervalos de prediccion o confianza, como hasta ahora.
+\item \strong{Modelos logit binomiales} (\code{glm} con \code{family = binomial}):
+devuelve la probabilidad estimada con un intervalo de confianza
+calculado en la escala del enlace (logit) y transformado a
+probabilidades. Incluye ademas una columna de clasificacion segun
+el umbral especificado.
+}
+
+Utilidad principal: en las practicas de los capitulos 9 (regresion lineal
+multiple) y 10 (modelos de eleccion discreta) permite al alumno definir en
+Excel varios escenarios de prediccion sin necesidad de codificarlos en R,
+incluyendo formulas que referencian variables de los data frames del script.
 
 Las formulas en las celdas de Excel se evaluan en un entorno donde:
 \itemize{
@@ -106,20 +123,27 @@ disponible bajo el nombre que se le asigne en la lista.
 }
 \examples{
 \dontrun{
-# Estimacion de un modelo log-lineal
-modelo <- lm(log(mpg) ~ wt + hp, data = mtcars)
-
-# Predicciones desde un archivo Excel con escenarios
+# --- Modelo lineal (capitulo 9) ---
+modelo_lm <- lm(log(mpg) ~ wt + hp, data = mtcars)
 res <- predict_from_excel_scenarios(
-  model          = modelo,
+  model          = modelo_lm,
   train_df       = mtcars,
   excel_path     = "escenarios.xlsx",
   sheet          = "Simula1",
   transforma_log = TRUE
 )
+res$table
 
-res$table    # tabla formateada
-res$data     # data frame crudo
+# --- Modelo logit (capitulo 10) ---
+modelo_glm <- glm(am ~ wt + hp, data = mtcars,
+                  family = binomial(link = "logit"))
+res2 <- predict_from_excel_scenarios(
+  model    = modelo_glm,
+  train_df = mtcars,
+  excel_path = "escenarios_logit.xlsx",
+  umbral   = 0.5
+)
+res2$table
 }
 
 }
