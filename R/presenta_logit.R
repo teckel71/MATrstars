@@ -102,7 +102,17 @@ presenta_logit <- function(modelo,
   # del paquete fmsb)
   n  <- nrow(modelo$model)
   L1 <- as.numeric(stats::logLik(modelo))
-  L0 <- as.numeric(stats::logLik(stats::update(modelo, . ~ 1)))
+
+  # Modelo nulo: se ajusta sobre modelo$model (el model frame almacenado
+  # internamente) para evitar problemas de scoping con update(), que
+  # intenta localizar el data frame original por nombre y puede fallar
+  # en entornos de renderizacion como bookdown.
+  var_dep <- names(modelo$model)[1]
+  formula_nula <- stats::as.formula(paste(var_dep, "~ 1"))
+  modelo_nulo_gof <- stats::glm(formula_nula,
+                                data   = modelo$model,
+                                family = modelo$family)
+  L0 <- as.numeric(stats::logLik(modelo_nulo_gof))
 
   cox_snell  <- 1 - exp(-(2 / n) * (L1 - L0))
   nagelkerke <- cox_snell / (1 - exp((2 / n) * L0))
